@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zerin AI - Private Neural Network</title>
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --bg-dark: #08080c;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(0, 242, 255, 0.2);
+        }
+
+        body {
+            margin: 0; background: var(--bg-dark); color: white;
+            font-family: 'Segoe UI', sans-serif; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* سەرپەڕەی مۆدێرن */
+        header {
+            padding: 15px; background: var(--glass); backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border); text-align: center;
+            font-weight: bold; letter-spacing: 2px; color: var(--neon-blue);
+        }
+
+        /* بەشی دابەزاندنی پاکێج */
+        .knowledge-bar {
+            padding: 10px; background: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px dashed var(--border); font-size: 0.8rem;
+        }
+
+        #chat-box {
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 15px;
+        }
+
+        .msg {
+            max-width: 85%; padding: 12px 18px; border-radius: 18px;
+            line-height: 1.6; position: relative; animation: slideUp 0.3s ease;
+        }
+
+        .user { align-self: flex-start; background: var(--neon-blue); color: #000; border-bottom-right-radius: 2px; }
+        .ai { align-self: flex-end; background: var(--glass); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
+
+        /* ناوچەی ناردن */
+        .input-area {
+            padding: 15px; background: var(--glass);
+            display: flex; gap: 10px; backdrop-filter: blur(10px);
+        }
+
+        input[type="text"] {
+            flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px; color: white; outline: none;
+        }
+
+        .btn {
+            background: var(--neon-blue); border: none; padding: 10px 15px;
+            border-radius: 12px; font-weight: bold; cursor: pointer; color: #000;
+        }
+
+        #file-input { display: none; }
+        .upload-label { cursor: pointer; color: var(--neon-blue); border: 1px solid var(--neon-blue); padding: 5px 10px; border-radius: 8px; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<header>ZERIN AI CORE v2.0</header>
+
+<div class="knowledge-bar">
+    <span>پاکێجی زانیاری: <b id="pkg-status">خاڵی</b></span>
+    <label for="file-input" class="upload-label">+ دابەزاندنی فایل (.txt)</label>
+    <input type="file" id="file-input" accept=".txt">
+</div>
+
+<div id="chat-box">
+    <div class="msg ai">سیستەم ئامادەیە. دەتوانیت کۆد وەربگریت یان فایلی زانیاری دابەزێنیت.</div>
+</div>
+
+<div class="input-area">
+    <input type="text" id="userInput" placeholder="فەرمان بنووسە یان پرسیار بکە...">
+    <button class="btn" onclick="askAI()">ناردن</button>
+</div>
+
+<script>
+    const TOKEN = "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"; // تۆکنەکەت لێرە دابنێ
+    const MODEL = "meta-llama/Meta-Llama-3-8B-Instruct";
+    let customKnowledge = "";
+
+    // خوێندنەوەی فایلی پاکێج
+    document.getElementById('file-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            customKnowledge = e.target.result;
+            document.getElementById('pkg-status').innerText = "چالاکە (" + file.name + ")";
+            alert("پاکێجی زانیاری بە سەرکەوتوویی دابەزییە ناو مێشکی AI");
+        };
+        reader.readAsText(file);
+    });
+
+    async function askAI() {
+        const input = document.getElementById('userInput');
+        const chatBox = document.getElementById('chat-box');
+        if (!input.value) return;
+
+        const userMsg = input.value;
+        chatBox.innerHTML += `<div class="msg user">${userMsg}</div>`;
+        input.value = "";
+
+        // ئامادەکردنی پرسیارەکە لەگەڵ پاکێجەکە
+        let prompt = userMsg;
+        if (customKnowledge) {
+            prompt = `زانیاری زیادە: ${customKnowledge}\n\nپرسیار: تەنها لەسەر بنەمای ئەو زانیارییە زیادەی سەرەوە وەڵامی ئەمە بدەرەوە: ${userMsg}`;
+        }
+
+        try {
+            const response = await fetch(`https://api-inference.huggingface.co/models/${MODEL}`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    inputs: prompt,
+                    parameters: { max_new_tokens: 1000, return_full_text: false }
+                })
+            });
+            const data = await response.json();
+            
+            let aiResponse = (data[0] && data[0].generated_text) ? data[0].generated_text : "ببوورە، وەڵام وەرنەگیرا.";
+            
+            chatBox.innerHTML += `<div class="msg ai">${aiResponse}</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        } catch (e) {
+            chatBox.innerHTML += `<div class="msg ai">هەڵە لە پەیوەندی! دڵنیابە تۆکنەکەت ڕاستە.</div>`;
+        }
+    }
+</script>
+
+</body>
+</html>
